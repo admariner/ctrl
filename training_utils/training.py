@@ -35,9 +35,14 @@ os.environ['PYTHONHASHSEED'] = str(args.seed)
 np.random.seed(args.seed)
 
 # load the vocabulary from file
-vocab = open('../vocab').read().decode(encoding='utf-8').split('\n') if not use_py3 else open('../vocab', encoding='utf-8').read().split('\n')
+vocab = (
+    open('../vocab', encoding='utf-8').read().split('\n')
+    if use_py3
+    else open('../vocab').read().decode(encoding='utf-8').split('\n')
+)
+
 vocab = list(map(lambda x: x.split(' ')[0], vocab)) + ['<unk>'] + ['\n']
-print ('{} unique words'.format(len(vocab)))
+print(f'{len(vocab)} unique words')
 
 # length of the vocabulary
 vocab_size = len(vocab)
@@ -93,13 +98,12 @@ class TiedEmbeddingSoftmax(tf.keras.layers.Layer):
                              trainable=True)
 
   def call(self, inputs, embed=True):
-    if embed:
+      if not embed:
+          return tf.tensordot(inputs, tf.transpose(self.w), 1) + self.b
       dtype = tf.keras.backend.dtype(inputs)
-      if dtype != 'int32' and dtype != 'int64':
-        inputs = math_ops.cast(inputs, 'int32')
+      if dtype not in ['int32', 'int64']:
+          inputs = math_ops.cast(inputs, 'int32')
       return embedding_ops.embedding_lookup(self.w, inputs)
-    else:
-      return tf.tensordot(inputs, tf.transpose(self.w), 1) + self.b
 
 # input for the keras model
 tokens = tf.keras.layers.Input(shape=(seq_length,), dtype='int32')

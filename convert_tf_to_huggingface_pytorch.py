@@ -55,7 +55,10 @@ for i in tqdm.tqdm(range(args.num_layers)):
     if i==0:
         layer_variables = sorted(filter(lambda x: 'layer/' in x, list_of_variables))
     else:
-        layer_variables = sorted(filter(lambda x: 'layer_'+str(i)+'/' in x, list_of_variables))
+        layer_variables = sorted(
+            filter(lambda x: f'layer_{str(i)}/' in x, list_of_variables)
+        )
+
 
     current_layer = model.transformer.h[i]
 
