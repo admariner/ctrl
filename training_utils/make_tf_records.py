@@ -29,22 +29,30 @@ domain = [args.control_code]
 
 train_text = open(path_to_train_file, 'rb').read().decode(encoding='utf-8')
 bpe = fastBPE.fastBPE('../codes', '../vocab')
-tokenized_train_text = bpe.apply([train_text.encode('ascii', errors='ignore') if not use_py3 else train_text])[0] # will NOT work for non-English texts 
+tokenized_train_text = bpe.apply(
+    [train_text if use_py3 else train_text.encode('ascii', errors='ignore')]
+)[0]
+
 # if you want to run non-english text, please tokenize separately using ./fast applybpe and then run this script on the .bpe file with utf8 encoding
 
 tokenized_train_text = re.findall(r'\S+|\n', tokenized_train_text)
 tokenized_train_text = list(filter(lambda x: x != u'@@', tokenized_train_text))
 
 # load the vocabulary from file
-vocab = open('../vocab').read().decode(encoding='utf-8').split('\n') if not use_py3 else open('../vocab', encoding='utf-8').read().split('\n')
+vocab = (
+    open('../vocab', encoding='utf-8').read().split('\n')
+    if use_py3
+    else open('../vocab').read().decode(encoding='utf-8').split('\n')
+)
+
 vocab = list(map(lambda x: x.split(' ')[0], vocab)) + ['<unk>'] + ['\n']
-print ('{} unique words'.format(len(vocab)))
+print(f'{len(vocab)} unique words')
 
 if args.control_code not in vocab:
     print('Provided control code is not in the vocabulary')
     print('Please provide a different one; refer to the vocab file for allowable tokens')
     sys.exit(1)
-    
+
 # Creating a mapping from unique characters to indices
 word2idx = {u:i for i, u in enumerate(vocab)}
 idx2word = np.array(vocab)
@@ -59,7 +67,7 @@ def numericalize(x):
             count += 1
     return count>1, [word2idx.get(i, word2idx['<unk>'])  for i in x]
 
-tfrecords_fname = fname.lower()+'.tfrecords'
+tfrecords_fname = f'{fname.lower()}.tfrecords'
 
 total = 0
 skipped = 0

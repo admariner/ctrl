@@ -30,9 +30,10 @@ os.environ['PYTHONHASHSEED'] = str(args.seed)
 np.random.seed(args.seed)
 
 # load the vocabulary from file
-vocab = open('vocab').read().decode(encoding='utf-8').split('\n') if not use_py3 else open('vocab', encoding='utf-8').read().split('\n')
+vocab = (open('vocab', encoding='utf-8').read().split('\n') if use_py3 else
+         open('vocab').read().decode(encoding='utf-8').split('\n'))
 vocab = list(map(lambda x: x.split(' ')[0], vocab)) + ['<unk>'] + ['\n']
-print ('{} unique words'.format(len(vocab)))
+print(f'{len(vocab)} unique words')
 
 # length of the vocabulary
 vocab_size = len(vocab)
@@ -73,13 +74,12 @@ class TiedEmbeddingSoftmax(tf.keras.layers.Layer):
                              trainable=True)
 
   def call(self, inputs, embed=True):
-    if embed:
-      dtype = tf.keras.backend.dtype(inputs)
-      if dtype != 'int32' and dtype != 'int64':
-        inputs = math_ops.cast(inputs, 'int32')
-      return embedding_ops.embedding_lookup(self.w, inputs)
-    else:
+    if not embed:
       return tf.tensordot(inputs, tf.transpose(self.w), 1) + self.b
+    dtype = tf.keras.backend.dtype(inputs)
+    if dtype not in ['int32', 'int64']:
+      inputs = math_ops.cast(inputs, 'int32')
+    return embedding_ops.embedding_lookup(self.w, inputs)
 
 # input for the keras model
 tokens = tf.keras.layers.Input(shape=(seq_length,), dtype='int32')
@@ -151,42 +151,42 @@ with open('control_codes.txt', 'r') as f:
     domains = [line.split() for line in f.readlines()]
     domains = [(t[1], float(t[0])) for t in domains]
 
-    
+
 while True:
-    _prompt = raw_input('ENTER PROMPT: ') if not use_py3 else input('ENTER PROMPT: ')
+  _prompt = input('ENTER PROMPT: ') if use_py3 else raw_input('ENTER PROMPT: ')
 
-    ppls = {}
+  ppls = {}
     # loop over all domains and compute perplexity
-    for domain, domain_prior in domains:
-       print(u'computing for domain: {}'.format(domain))
+  for domain, domain_prior in domains:
+    print(f'computing for domain: {domain}')
        # tokenize data and add domain tag to it
-       prompt = domain + u' ' + _prompt
-       split_prompt = bpe.apply([prompt])[0].split()
+    prompt = f'{domain} {_prompt}'
+    split_prompt = bpe.apply([prompt])[0].split()
 
-       # numericalize data and pad to the seq_len dimension
-       text = [word2idx[i] for i in split_prompt]
-       padding_text = text + [0] * (seq_length - len(text))
-       tokens_generated = np.tile(padding_text, (2,1)) 
-       output_scores = predict_fn({'input_1':tokens_generated})['tied_embedding_softmax'].squeeze()[0]
-       token_scores = output_scores[:-1]
+    # numericalize data and pad to the seq_len dimension
+    text = [word2idx[i] for i in split_prompt]
+    padding_text = text + [0] * (seq_length - len(text))
+    tokens_generated = np.tile(padding_text, (2,1))
+    output_scores = predict_fn({'input_1':tokens_generated})['tied_embedding_softmax'].squeeze()[0]
+    token_scores = output_scores[:-1]
 
-       # compute the perplexity for this sequence
-       xent = 0
-       for sequence_idx, token_idx in enumerate(text[1:]):
-           token = idx2word[token_idx]
+    # compute the perplexity for this sequence
+    xent = 0
+    for sequence_idx, token_idx in enumerate(text[1:]):
+        token = idx2word[token_idx]
 
-           # compute the probability of this token
-           Z = np.exp(token_scores[sequence_idx]).sum()
-           token_prob = np.exp(token_scores[sequence_idx, token_idx]) / Z 
-           xent -= np.log(token_prob) / len(text[1:])
-           
-       ppls[domain] = round(np.exp(xent), 6)
-       #print(u'{} ppl = {}'.format(domain, ppls[domain]))
+        # compute the probability of this token
+        Z = np.exp(token_scores[sequence_idx]).sum()
+        token_prob = np.exp(token_scores[sequence_idx, token_idx]) / Z 
+        xent -= np.log(token_prob) / len(text[1:])
+
+    ppls[domain] = round(np.exp(xent), 6)
+         #print(u'{} ppl = {}'.format(domain, ppls[domain]))
 
     # sort the domains based on perplexities and print
-    ppls = [(k, v) for k, v in ppls.items()]
-    ppls.sort(key=lambda x: x[1])
-    print('PROMPT: {}'.format(_prompt))
-    for t in ppls:
-        domain, ppl = t
-        print(u'{} ppl = {}'.format(domain, ppl))
+  ppls = list(ppls.items())
+  ppls.sort(key=lambda x: x[1])
+  print(f'PROMPT: {_prompt}')
+  for t in ppls:
+    domain, ppl = t
+    print(f'{domain} ppl = {ppl}')

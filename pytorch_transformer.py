@@ -18,27 +18,27 @@ def angle_defn(pos, i, d_model_size):
 def positional_encoding(position, d_model_size):
   # create the sinusoidal pattern for the positional encoding
   angle_rads = angle_defn(np.arange(position)[:, np.newaxis], np.arange(d_model_size)[np.newaxis, :], d_model_size)
-  
+
   sines = np.sin(angle_rads[:, 0::2])
   cosines = np.cos(angle_rads[:, 1::2])
-  
-  pos_encoding = torch.tensor(np.concatenate([sines, cosines], axis=-1)[np.newaxis, ...], dtype=torch.float)
-  return pos_encoding
+
+  return torch.tensor(
+      np.concatenate([sines, cosines], axis=-1)[np.newaxis, ...],
+      dtype=torch.float,
+  )
 
 def scaled_dot_product_attention(q, k, v, mask):
   # calculate attention
   matmul_qk = torch.matmul(q, k.permute(0,1,3,2))
-  
+
   dk = k.shape[-1]
   scaled_attention_logits = matmul_qk / np.sqrt(dk)
 
   if mask is not None:
     scaled_attention_logits += (mask * -1e9)
-    
-  attention_weights = torch.softmax(scaled_attention_logits, dim=-1) 
-  output = torch.matmul(attention_weights, v)
-  
-  return output
+
+  attention_weights = torch.softmax(scaled_attention_logits, dim=-1)
+  return torch.matmul(attention_weights, v)
 
 
 class MultiHeadAttention(torch.nn.Module):
@@ -61,20 +61,18 @@ class MultiHeadAttention(torch.nn.Module):
     
   def forward(self, v, k, q, mask):
     batch_size = q.shape[0]
-    
+
     q = self.Wq(q)
     k = self.Wk(k)
     v = self.Wv(v)
-    
+
     q = self.split_into_heads(q, batch_size)
     k = self.split_into_heads(k, batch_size)
     v = self.split_into_heads(v, batch_size)
-    
+
     scaled_attention = scaled_dot_product_attention(q, k, v, mask).permute([0, 2, 1, 3])
     original_size_attention = scaled_attention.reshape(batch_size, -1, self.d_model_size)
-    output = self.dense(original_size_attention)
-        
-    return output
+    return self.dense(original_size_attention)
 
 
 

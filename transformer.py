@@ -8,28 +8,29 @@ def angle_defn(pos, i, d_model_size):
 def positional_encoding(position, d_model_size):
   # create the sinusoidal pattern for the positional encoding
   angle_rads = angle_defn(np.arange(position)[:, np.newaxis], np.arange(d_model_size)[np.newaxis, :], d_model_size)
-  
+
   sines = np.sin(angle_rads[:, 0::2])
   cosines = np.cos(angle_rads[:, 1::2])
-  
-  pos_encoding = tf.cast(np.concatenate([sines, cosines], axis=-1)[np.newaxis, ...], dtype=tf.float32)
-  return pos_encoding 
+
+  return tf.cast(
+      np.concatenate([sines, cosines], axis=-1)[np.newaxis, ...],
+      dtype=tf.float32,
+  ) 
 
 
 
 def scaled_dot_product_attention(q, k, v, mask):
   # calculate attention
   matmul_qk = tf.matmul(q, k, transpose_b=True)
-  
+
   dk = tf.cast(tf.shape(k)[-1], tf.float32)
   scaled_attention_logits = matmul_qk / tf.math.sqrt(dk)
 
   if mask is not None:
     scaled_attention_logits += (mask * -1e9)
-    
-  attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1) 
-  output = tf.matmul(attention_weights, v) 
-  return output
+
+  attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1)
+  return tf.matmul(attention_weights, v)
 
 class MultiHeadAttention(tf.keras.layers.Layer):
   def __init__(self, d_model_size, num_heads):
@@ -51,20 +52,18 @@ class MultiHeadAttention(tf.keras.layers.Layer):
     
   def call(self, v, k, q, mask):
     batch_size = tf.shape(q)[0]
-    
+
     q = self.Wq(q)
     k = self.Wk(k)
     v = self.Wv(v)
-    
+
     q = self.split_into_heads(q, batch_size)
     k = self.split_into_heads(k, batch_size)
     v = self.split_into_heads(v, batch_size)
-    
+
     scaled_attention = tf.transpose(scaled_dot_product_attention(q, k, v, mask), perm=[0, 2, 1, 3])
     original_size_attention = tf.reshape(scaled_attention,  (batch_size, -1, self.d_model_size))
-    output = self.dense(original_size_attention) 
-        
-    return output
+    return self.dense(original_size_attention)
 
 
 
@@ -119,8 +118,7 @@ class Encoder(tf.keras.layers.Layer):
     self.dropout = tf.keras.layers.Dropout(rate)
 
   def get_config(self):
-    base_config = super(Encoder, self).get_config()
-    return base_config
+    return super(Encoder, self).get_config()
   
   def call(self, x, training):
 
